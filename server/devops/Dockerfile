@@ -1,6 +1,14 @@
 FROM python:3.9-slim
 
-WORKDIR /app
+# Define build arguments
+ARG EXPOSED_PORT=8000
+ARG REPO_PATH=/app
+
+# Set environment variables
+ENV EXPOSED_PORT=${EXPOSED_PORT}
+ENV REPO_PATH=${REPO_PATH}
+
+WORKDIR /app/
 
 COPY resources/requirements.txt .
 
@@ -10,8 +18,7 @@ RUN apt-get update && \
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ./resources/config.yml ./resources/config.yml
 COPY ./src ./src
 COPY main.py ./main.py
 
-EXPOSE 8000
+EXPOSE ${EXPOSED_PORT}

@@ -1,14 +1,14 @@
 from fastapi import FastAPI
-from src import Server, RepoRequest, Configuration
+from src import Server, RepoRequest
 from loguru import logger as log
 import sys
+from os import getenv
 
 
 log.add(sys.stderr, level="INFO")
 
 app = FastAPI()
-config = Configuration('./resources/config.yml')
-server = Server(config.get_repo_path())
+server = Server((getenv('REPO_PATH', '/repositories')))
 
 """
 Receives a POST request with a JSON body containing the URL of the repository to clone
