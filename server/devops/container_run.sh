@@ -26,5 +26,6 @@ docker run \
     --name $IMAGE_NAME \
     -p $EXPOSED_PORT:$EXPOSED_PORT \
     -v $DIR_PATH:$DIR_PATH \
+    --network=nginx-proxy-net \
     $IMAGE_NAME \
     bash -c "uvicorn main:app --host 0.0.0.0 --port $EXPOSED_PORT"

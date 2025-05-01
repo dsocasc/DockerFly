@@ -2,3 +2,6 @@
 server:
   exposed_port: 8080
   repositories_clone_path: /repositories
+
+ui:
+  exposed_port: 8081

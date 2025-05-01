@@ -8,6 +8,9 @@ ARG REPO_PATH=/app
 ENV EXPOSED_PORT=${EXPOSED_PORT}
 ENV REPO_PATH=${REPO_PATH}
 
+ENV VIRTUAL_HOST="dockerfly-server.nimbus.net"
+ENV VIRTUAL_PORT=${EXPOSED_PORT}
+
 WORKDIR /app/
 
 COPY resources/requirements.txt .

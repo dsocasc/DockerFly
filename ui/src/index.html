@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enviar Repositorio</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="title">
+            <h1>Enviar Repositorio</h1>
+            <p class="subtitle">Introduce la URL del repositorio para procesarla</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="url">URL del Repositorio</label>
+            <input 
+                type="text" 
+                id="url" 
+                placeholder="https://github.com/usuario/repositorio" 
+                autocomplete="off"
+            >
+        </div>
+        
+        <button id="submit-button" type="button">
+            Enviar
+        </button>
+        
+        <div id="error-message" class="message error hidden">
+            Por favor, introduce una URL válida
+        </div>
+        
+        <div id="success-message" class="message success hidden">
+            Solicitud procesada correctamente
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
