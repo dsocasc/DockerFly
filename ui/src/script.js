@@ -4,28 +4,65 @@ const submitButton = document.getElementById('submit-button');
 const errorMessage = document.getElementById('error-message');
 const successMessage = document.getElementById('success-message');
 
-// Función para manejar el envío del formulario
+
+let serverUrl = '';
+
+async function loadConfig() {
+    try {
+        if (typeof jsyaml === 'undefined') {
+            await loadJsYaml();
+        }
+        
+        const response = await fetch('config.yml');
+        if (!response.ok) {
+            throw new Error('No se pudo cargar el archivo de configuración');
+        }
+        
+        const configText = await response.text();
+        const config = jsyaml.load(configText);
+        
+        if (config && config.ui && config.ui.server_url) {
+            serverUrl = config.ui.server_url;
+            console.log('URL del servidor cargada:', serverUrl);
+        } else {
+            throw new Error('No se encontró la URL del servidor en el archivo de configuración');
+        }
+    } catch (error) {
+        console.error('Error al cargar configuración:', error);
+        errorMessage.textContent = 'Error al cargar la configuración: ' + error.message;
+        errorMessage.classList.remove('hidden');
+    }
+}
+
+async function loadJsYaml() {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('No se pudo cargar js-yaml'));
+        document.head.appendChild(script);
+    });
+}
+
+loadConfig();
+
 submitButton.addEventListener('click', async function() {
-    // Ocultar mensajes anteriores
     errorMessage.classList.add('hidden');
     successMessage.classList.add('hidden');
     
     const url = urlInput.value.trim();
     
-    // Validación básica
     if (!url) {
         errorMessage.textContent = 'Por favor, introduce una URL válida';
         errorMessage.classList.remove('hidden');
         return;
     }
     
-    // Mostrar indicador de carga
     submitButton.disabled = true;
     submitButton.innerHTML = '<div class="spinner"></div> Procesando...';
     
     try {
-        // Hacer la petición al servidor
-        const response = await fetch(`http://dockerfly-server.nimbus.net/repo`, {
+        const response = await fetch(`${serverUrl}`, {
             method: 'POST',
             headers: {
             'Content-Type': 'application/json'

@@ -6,12 +6,14 @@ CONFIG_FILE_PATH = ../config.yml
 
 # Read values from config.yml
 EXPOSED_PORT := $(shell yq '.ui.exposed_port' $(CONFIG_FILE_PATH))
+NETWORK_NAME := $(shell yq '.docker.network_name' $(CONFIG_FILE_PATH))
+URL := $(shell yq '.ui.url' $(CONFIG_FILE_PATH))
 
 build:
 	docker build \
 				-t $(IMAGE_NAME) \
 				-f $(DOCKERFILE_PATH) \
-				--build-arg EXPOSED_PORT=$(EXPOSED_PORT) \
+				--build-arg URL=$(URL) \
 				.
 
 run: build
@@ -19,7 +21,7 @@ run: build
 		-d \
 		--name $(IMAGE_NAME) \
 		-p $(EXPOSED_PORT):80 \
-		--network=nginx-proxy-net \
+		--network=$(NETWORK_NAME) \
 		$(IMAGE_NAME)
 
 clean:
