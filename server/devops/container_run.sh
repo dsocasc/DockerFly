@@ -4,6 +4,7 @@
 IMAGE_NAME=$1
 EXPOSED_PORT=$2
 DIR_PATH=$3
+NETWORK_NAME=$4
 
 if [ -z "$IMAGE_NAME" ] || [ -z "$EXPOSED_PORT" ] || [ -z "$DIR_PATH" ]; then
     echo "Error: All parameters are required"
@@ -26,5 +27,6 @@ docker run \
     --name $IMAGE_NAME \
     -p $EXPOSED_PORT:$EXPOSED_PORT \
     -v $DIR_PATH:$DIR_PATH \
+    --network=$NETWORK_NAME \
     $IMAGE_NAME \
     bash -c "uvicorn main:app --host 0.0.0.0 --port $EXPOSED_PORT"

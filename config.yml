@@ -1,4 +1,13 @@
 ---
+docker:
+  network_name: null
+
 server:
-  exposed_port: 8080
-  repositories_clone_path: /repositories
+  exposed_port: null
+  repositories_clone_path: null
+  url: null
+  
+ui:
+  exposed_port: null
+  server_url: null
+  url: null
