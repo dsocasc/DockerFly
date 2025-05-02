@@ -93,26 +93,26 @@ submitButton.addEventListener('click', async function() {
             throw new Error(`Error ${response.status}: ${response.statusText}. Response: ${responseText || '(empty)'}`);
         }
         
-        if (successAppName) successAppName.textContent = data.app_name || 'N/D';
-        if (successAccessUrl) {
-            successAccessUrl.href = data.access_url || '#';
-            successAccessUrl.textContent = data.access_url || 'N/D';
-            if (!data.access_url) {
-                 successAccessUrl.removeAttribute('href');
-                 successAccessUrl.style.textDecoration = 'none';
-                 successAccessUrl.style.cursor = 'default';
-            } else {
-                 successAccessUrl.style.textDecoration = '';
-                 successAccessUrl.style.cursor = '';
+        if (response.ok) {
+            if (successAppName) successAppName.textContent = data.app_name || 'N/D';
+            if (successAccessUrl) {
+                successAccessUrl.href = data.access_url || '#';
+                successAccessUrl.textContent = data.access_url || 'N/D';
+                if (!data.access_url) {
+                    successAccessUrl.removeAttribute('href');
+                    successAccessUrl.style.textDecoration = 'none';
+                    successAccessUrl.style.cursor = 'default';
+                } else {
+                    successAccessUrl.style.textDecoration = '';
+                    successAccessUrl.style.cursor = '';
+                }
             }
-        }
-        if (successContainerId) successContainerId.textContent = data.container_id || 'N/D';
-        if (successCommitHash) successCommitHash.textContent = data.current_commit ? data.current_commit.substring(0, 7) : 'N/D';
+            if (successContainerId) successContainerId.textContent = data.container_id || 'N/D';
+            if (successCommitHash) successCommitHash.textContent = data.current_commit ? data.current_commit.substring(0, 7) : 'N/D';
 
-        successMessageDiv.classList.remove('hidden');
-        urlInput.value = '';
-
-        if (!response.ok) {
+            successMessageDiv.classList.remove('hidden');
+            urlInput.value = '';
+        } else {
             // Intentar obtener mensaje de error de FastAPI o genérico
             const errorMsg = data?.detail || data?.message || `Error ${response.status}: ${JSON.stringify(data)}`;
             throw new Error(errorMsg);
