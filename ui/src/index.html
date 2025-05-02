@@ -1,41 +1,53 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enviar Repositorio</title>
+    <title>DockerFly</title>
+    <link rel="icon" href="icon.png" type="image/png">
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="container">
         <div class="title">
-            <h1>Enviar Repositorio</h1>
-            <p class="subtitle">Introduce la URL del repositorio para procesarla</p>
+
+            <img src="icon.png" alt="DockerFly Icon" id="logo-icon" draggable="false">
+            <h1>Despliegue</h1>
+            <p class="subtitle">Introduce la URL del repositorio Git para desplegarlo</p>
         </div>
-        
+
         <div class="form-group">
             <label for="url">URL del Repositorio</label>
-            <input 
-                type="text" 
-                id="url" 
-                placeholder="https://github.com/usuario/repositorio" 
+            <input
+                type="text"
+                id="url"
+                placeholder="https://github.com/usuario/repositorio.git"
                 autocomplete="off"
             >
         </div>
-        
         <button id="submit-button" type="button">
-            Enviar
+            Desplegar
         </button>
-        
         <div id="error-message" class="message error hidden">
-            Por favor, introduce una URL válida
+            Error placeholder
         </div>
-        
         <div id="success-message" class="message success hidden">
-            Solicitud procesada correctamente
+            <p><strong>¡Despliegue Exitoso!</strong></p>
+            <p>Aplicación '<strong id="success-app-name"></strong>' desplegada.</p>
+            <p>
+                Accesible en:
+                <a id="success-access-url" href="#" target="_blank" rel="noopener noreferrer"></a>
+            </p>
+            <p style="margin-top: 10px; font-size: 0.8em; color: #aaa;">
+                Container ID: <span id="success-container-id"></span> <br>
+                Commit: <span id="success-commit-hash"></span>
+            </p>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
