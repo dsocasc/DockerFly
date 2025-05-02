@@ -391,7 +391,7 @@ class Server:
                 # Compare hashes
                 if local_commit.hexsha != remote_commit.hexsha:
                     log.info(f"Update detected for '{container_name}'! Local: {local_commit.hexsha[:7]}, Remote: {remote_commit.hexsha[:7]}")
-                    # It woould be ideal to launch the update in a separate thread or task
+                    # It would be ideal to launch the update in a separate thread or task
                     # to avoid blocking the main thread. For now, we will just call the update function directly.
                     await self.trigger_update(container_name, app_state)
                 else:
