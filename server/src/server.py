@@ -403,7 +403,8 @@ class Server:
     async def trigger_update(self, container_name: str, app_state: Dict[str, Any]):
         """Realiza git pull y redespliega la aplicación."""
         repo_path = app_state['repo_path']
-        repo_name = app_state['repo_name'] # Necesitamos el repo_name original
+        repo_name = app_state['repo_name'] 
+        repo_url = app_state['repo_url']
         log.info(f"Triggering update for '{container_name}'...")
 
         try:
@@ -415,7 +416,6 @@ class Server:
             if pull_info[0].flags & FetchInfo.HEAD_UPTODATE:
                 log.info(f"Pull completed for '{container_name}', but no changes detected.")
                 app_state['last_commit'] = cloned_repo.head.commit.hexsha
-                return # Doesn't need to redeploy if no changes
 
             new_commit_hash = cloned_repo.head.commit.hexsha
             log.success(f"Successfully pulled updates for '{container_name}'. New commit: {new_commit_hash[:7]}")
@@ -428,7 +428,7 @@ class Server:
             dockerfile_content, new_app_config = generation_result
 
             log.info(f"Redeploying application '{container_name}'...")
-            deployment_result = self.deploy_app(repo_path, repo_name, dockerfile_content, new_app_config)
+            deployment_result = self.deploy_app(repo_path, repo_name, repo_url, dockerfile_content, new_app_config)
 
             if deployment_result:
                 log.success(f"Update deployment successful for '{container_name}'.")
