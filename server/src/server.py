@@ -189,15 +189,23 @@ class Server:
         network_name = self.main_config.get('docker', {}).get('network_name', 'bridge')
         container_port = app_config.get('port')
 
+        generated_dockerfile_path = os.path.join(repo_path, "Dockerfile.dockerfly") # Usar nombre distinto? O 'Dockerfile'
+        try:
+            with open(generated_dockerfile_path, 'w', encoding='utf-8') as f:
+                f.write(dockerfile_content)
+            log.info(f"Generated Dockerfile content written to: {generated_dockerfile_path}")
+        except IOError as e:
+            log.error(f"Failed to write generated Dockerfile to {generated_dockerfile_path}: {e}")
+            return None
+
         log.info(f"Starting deployment for app '{app_name}'...")
 
         # 1. Build the image using the Dockerfile content
-        dockerfile_fileobj = io.BytesIO(dockerfile_content.encode('utf-8'))
         try:
             log.info(f"Building image '{image_tag}' from context path '{repo_path}'...")
             image, build_logs_stream = self.docker_client.images.build(
                 path=repo_path,
-                fileobj=dockerfile_fileobj,
+                dockerfile=os.path.basename(generated_dockerfile_path),
                 tag=image_tag,
                 rm=True,
                 forcerm=True
@@ -206,9 +214,13 @@ class Server:
 
         except BuildError as e:
             log.error(f"Docker build failed for image '{image_tag}':")
+            log.error("Attempting to log detailed build output:")
+            # Iterar sobre el generador de logs del build
             for line in e.build_log:
-                if 'stream' in line:
-                    log.error(f"Build log: {line['stream'].strip()}")
+                if isinstance(line, dict) and 'stream' in line:
+                    log.error(line['stream'].strip())
+                elif isinstance(line, str):
+                    log.error(line.strip())
             return None
         except APIError as e:
             log.error(f"Docker API error during build for '{image_tag}': {e}")
