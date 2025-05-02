@@ -31,7 +31,7 @@ body {
 /* Titulo y subtitulo */
 .title {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 30px;
 }
 
 h1 {
@@ -70,7 +70,7 @@ input {
 
 input:focus {
     outline: none;
-    border-color: #9333ea;
+    border-color: #0080cd;
     box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.2);
 }
 
@@ -84,7 +84,7 @@ button {
     padding: 14px;
     border-radius: 8px;
     border: none;
-    background-color: #9333ea;
+    background-color: #0080cd;
     color: white;
     font-size: 16px;
     font-weight: bold;
@@ -96,11 +96,11 @@ button {
 }
 
 button:hover {
-    background-color: #7e22ce;
+    background-color: #00619e;
 }
 
 button:disabled {
-    background-color: #7e22ce;
+    background-color: #00619e;
     opacity: 0.7;
     cursor: not-allowed;
 }
@@ -146,4 +146,40 @@ button:disabled {
 /* Ocultar elementos */
 .hidden {
     display: none;
+}
+
+/* Logo */
+.logo-title-container {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+#logo-icon {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 15px; 
+    width: 235px;
+    height: 180px;
+    transition: transform 0.3s ease-in-out;
+}
+
+#loogo-icon:hover {
+    transform: scale(1.15);
+    cursor: pointer;
+    filter: brightness(1.1);
+    opacity: 0.9;
+}
+
+.title h1 {
+    font-size: 30px;
+    color: #ffffff;
+    margin-bottom: 8px;
+    margin-top: 0;
+}
+
+.title p.subtitle {
+    font-size: 14px;
+    color: #aaaaaa;
+    margin-top: 0;
 }

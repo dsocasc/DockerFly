@@ -8,6 +8,7 @@ COPY ./src/index.html /usr/share/nginx/html/index.html
 COPY ./src/script.js /usr/share/nginx/html/script.js
 COPY ./src/styles.css /usr/share/nginx/html/styles.css
 COPY ./src/favicon.ico /usr/share/nginx/html/favicon.ico
+COPY ./src/icon.png /usr/share/nginx/html/icon.png
 COPY ./resources/config.yml /usr/share/nginx/html/config.yml
 
 # Expose port 80

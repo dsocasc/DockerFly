@@ -301,7 +301,7 @@ class Server:
             # Build access URL (assuming localhost, could be configurable)
             # TODO: Get the host IP/hostname more reliably if not localhost
             host_access_point = "localhost"
-            access_url = f"http://{host_access_point}:{assigned_host_port}"
+            access_url = f"http://{app_name}"
 
             log.success(f"Container '{container_name}' started successfully (ID: {container.short_id}).")
             log.info(f"App '{app_name}' running internally on port {container_port}. Access via: {access_url}")
