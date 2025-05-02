@@ -9,5 +9,4 @@ server:
   
 ui:
   exposed_port: null
-  server_url: null
   url: null
