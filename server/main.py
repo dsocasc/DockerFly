@@ -42,7 +42,7 @@ async def check_all_repos_for_updates():
 @app.on_event("startup")
 async def startup_event():
     log.info('Starting scheduler...')
-    scheduler.add_job(check_all_repos_for_updates, 'interval', minutes=5, id='repo_update_check')
+    scheduler.add_job(check_all_repos_for_updates, 'interval', minutes=1, id='repo_update_check')
     scheduler.start()
     log.info('Scheduler started.')
 

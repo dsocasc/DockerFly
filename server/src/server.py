@@ -7,6 +7,7 @@ import shutil
 from typing import Optional, Tuple, Dict, Any
 import docker
 from docker.errors import BuildError, APIError, NotFound
+from git.remote import FetchInfo
 
 class Server:
 
@@ -411,7 +412,7 @@ class Server:
             log.info(f"Pulling changes for '{container_name}'...")
             pull_info = origin.pull()
 
-            if pull_info[0].flags & pull_info[0].flags.HEAD_UPTODATE:
+            if pull_info[0].flags & FetchInfo.flags.HEAD_UPTODATE:
                 log.info(f"Pull completed for '{container_name}', but no changes detected.")
                 app_state['last_commit'] = cloned_repo.head.commit.hexsha
                 return # Doesn't need to redeploy if no changes
