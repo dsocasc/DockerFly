@@ -9,6 +9,9 @@ All the configuratio can be set in [config.yml](./config.yml):
 - The server configuration can be specified under the **server** section (explained in [README.md](./server/README.md) of the server).
 - The ui configuration can be specified under the **ui** section (explained in [README.md](./ui/README.md) of the ui).
 
+A second [configuration file](./ui/resources/config.yml) is needed for specifying the server URL where the POST request should be sent.
+  - Under the section **ui**, set the variable **server_url** with the URL of the server (Eg: ```http://{server url}/repo```)
+
 ## App Structure for deployment
 The repository must have this three elements:
 - **dockerfly.yaml**: configuration file for defining the parameters for the deployment of the app.
@@ -39,3 +42,6 @@ start_command:
 For starting the server and the web UI, execute the [./start.sh](./start.sh) script.
 
 You may also atert each component individually simply by executing ```make run``` in each directory.
+
+## Troubleshooting
+If error with ```yq``` install with ```apt install yq```.

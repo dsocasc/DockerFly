@@ -18,3 +18,4 @@ A [Makefile](./Makefile) is available for creating the image and running the con
 
 ## Usage
 When the container is running, the webpage should be available at the URL defined in the [config.yml](../config.yml) file using the **url** variable.
+
