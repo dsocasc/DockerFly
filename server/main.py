@@ -4,7 +4,7 @@ from src import Server, RepoRequest
 from loguru import logger as log
 import sys
 from os import getenv
-
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 log.add(sys.stderr, level="INFO")
 
@@ -16,6 +16,8 @@ try:
 except Exception as e:
     log.critical(f'Error initializing Server: {e}')
     sys.exit(1)
+
+scheduler = AsyncIOScheduler()
 
 # Lista de orígenes permitidos
 origins = [
@@ -29,6 +31,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+async def check_all_repos_for_updates():
+    log.info('Scheduler running: checking all deployed repositories for updates...')
+    try:
+        await server.check_all_updates()
+    except Exception as e:
+        log.error(f"Error during scheduled check: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    log.info('Starting scheduler...')
+    scheduler.add_job(check_all_repos_for_updates, 'interval', minutes=5, id='repo_update_check')
+    scheduler.start()
+    log.info('Scheduler started.')
+
+@app.on_event("shutdown")
+async def startup_event():
+    log.info('Shutting down scheduler...')
+    scheduler.shutdown()
+    log.info('Scheduler shutdown complete.')
 
 """
 Receives a POST request with a JSON body containing the URL of the repository to clone
@@ -65,7 +87,7 @@ async def send_repo(repo_request: RepoRequest):
 
     # 3. Deploy application
     try:
-        deployment_result = server.deploy_app(repo_path, repo_name, dockerfile_content, app_config)
+        deployment_result = server.deploy_app(repo_path, repo_name, repo_url, dockerfile_content, app_config)
         if deployment_result is None:
             raise HTTPException(
                 status_code=500,

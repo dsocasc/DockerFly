@@ -12,6 +12,7 @@ class Server:
 
     # Constructor for the Server class
     def __init__(self, path: str = '/repositories/', main_config: Dict[str, Any] = None):
+        # Path
         try:
             os.makedirs(path, exist_ok=True)
             self.path = path
@@ -21,6 +22,7 @@ class Server:
             log.critical(f'Cannot create or access repository base path {path}: {e}')
             raise
 
+        # Docker client
         try:
             self.docker_client = docker.from_env()
             self.docker_client.ping()
@@ -28,6 +30,9 @@ class Server:
         except Exception as e:
             log.critical(f'Error initializing Docker client: {e}')
             raise
+
+        self.deployed_apps: Dict[str, Dict[str, Any]] = {}
+
 
     def _log_git_progress(self, op_code, cur_count, max_count=None, message=''):
         log.debug(f"Cloning progress: Op={op_code}, Count={cur_count}, Max={max_count or 'N/A'}, Msg='{message.strip() or '...'}'")
@@ -60,11 +65,11 @@ class Server:
             if os.path.exists(repo_clone_path):
                 log.error(f'Repository {repo_name} already exists. Skipping clone.')
                 # TODO: Decidir si ignorar o actualizar el repositorio existente
-                return repo_clone_path, repo_url
+                return repo_clone_path, repo_name
 
             Repo.clone_from(repo_url, repo_clone_path, progress=self._log_git_progress)
             log.success(f'Repository cloned successfully to {repo_clone_path}')
-            return repo_clone_path, repo_url
+            return repo_clone_path, repo_name
 
         except ValueError as ve:
             log.error(f'Error processing repository URL/name: {ve}')
@@ -178,7 +183,7 @@ class Server:
 
         return dockerfile_content, config
 
-    def deploy_app(self, repo_path: str, repo_name: str, dockerfile_content: str, app_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def deploy_app(self, repo_path: str, repo_name: str, repo_url: str, dockerfile_content: str, app_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Construye la imagen Docker y lanza el contenedor para la aplicación.
         Devuelve un diccionario con info del despliegue o None si falla.
@@ -296,20 +301,148 @@ class Server:
             log.success(f"Container '{container_name}' started successfully (ID: {container.short_id}).")
             log.info(f"App '{app_name}' running internally on port {container_port}. Access via: {access_url}")
 
-            return {
-                "message": "Deployment successful",
-                "app_name": app_name,
-                "container_name": container_name,
-                "container_id": container.short_id,
-                "image_tag": image_tag,
-                "internal_port": container_port,
-                "assigned_host_port": assigned_host_port,
-                "access_url": access_url
-            }
+            try:
+                cloned_repo_git = Repo(repo_path)
+                current_commit_hash = cloned_repo_git.head.commit.hexsha
+                log.debug(f"Stored state for '{container_name}': {current_commit_hash[:7]}")
 
+                self.deployed_apps[container_name] = {
+                    "repo_url": repo_url,
+                    "repo_path": repo_path,
+                    "repo_name": repo_name,
+                    "app_name": app_name,
+                    "last_commit": current_commit_hash,
+                    "container_id": container.id,
+                    "image_tag": image_tag,
+                    "app_config": app_config,
+                }
+
+                deployment_info = {
+                    "message": "Deployment successful",
+                    "app_name": app_name,
+                    "container_name": container_name,
+                    "container_id": container.short_id,
+                    "image_tag": image_tag,
+                    "internal_port": container_port,
+                    "assigned_host_port": assigned_host_port,
+                    "access_url": access_url,
+                    "current_commit": current_commit_hash
+                }
+
+                return deployment_info
+            except Exception as e:
+                log.error(f"Failed to get current commit or store state for '{container_name}': {e}")
+                deployment_info = {
+                    "message": "Deployment succesful but failed to store state",
+                    "app_name": app_name,
+                    "container_name": container_name,
+                    "container_id": container.short_id,
+                    "image_tag": image_tag,
+                    "internal_port": container_port,
+                    "assigned_host_port": assigned_host_port,
+                    "access_url": access_url,
+                    "current_commit": None
+                }
         except APIError as e:
             log.error(f"Docker API error starting container '{container_name}': {e}")
             return None
         except Exception as e:
             log.exception(f"Unexpected error running container '{container_name}': {e}")
             return None
+    
+    async def check_all_updates(self):
+        log.info(f"Checking updates for {len(self.deployed_apps)} deployed app(s).")
+        apps_to_update = []
+        for container_name, app_state in self.deployed_apps.items():
+            repo_path = app_state.get('repo_path')
+            last_known_commit = app_state.get('last_commit')
+            log.debug(f"Checking app '{container_name}' at {repo_path} for updates...")
+            if not repo_path or not last_known_commit:
+                log.error(f"Skipping app '{container_name}': missing state information.")
+                continue
+
+            try:
+                cloned_repo = Repo(repo_path)
+                # Fetch updates from the remote repository
+                try:
+                    origin = cloned_repo.remotes.origin
+                    log.debug(f"Fetching updates for '{container_name}' from remote '{origin.name}'...")
+                    origin.fetch()
+                except Exception as fetch_e:
+                    log.error(f"Failed to fetch updates for '{container_name}': {fetch_e}")
+                    continue
+
+                # Get current HEAD
+                default_branch = 'main'
+                local_commit = cloned_repo.head.commit
+                remote_commit = None
+                if default_branch in origin.refs:
+                    remote_commit = origin.refs[default_branch].commit
+                else:
+                    default_branch = 'master'
+                    if default_branch in origin.refs:
+                        remote_commit = origin.refs[default_branch].commit
+                
+                if not remote_commit:
+                    log.warning(f"Could not find default branch ({default_branch} or master) in remote for '{container_name}'. Skipping update check.")
+                    continue
+
+                # Compare hashes
+                if local_commit.hexsha != remote_commit.hexsha:
+                    log.info(f"Update detected for '{container_name}'! Local: {local_commit.hexsha[:7]}, Remote: {remote_commit.hexsha[:7]}")
+                    # It woould be ideal to launch the update in a separate thread or task
+                    # to avoid blocking the main thread. For now, we will just call the update function directly.
+                    await self.trigger_update(container_name, app_state)
+                else:
+                    log.debug(f"App '{container_name}' is up-to-date.")
+            
+            except Exception as e:
+                log.error(f"Error checking repository at '{repo_path}' for app '{container_name}': {e}")
+
+    async def trigger_update(self, container_name: str, app_state: Dict[str, Any]):
+        """Realiza git pull y redespliega la aplicación."""
+        repo_path = app_state['repo_path']
+        repo_name = app_state['repo_name'] # Necesitamos el repo_name original
+        log.info(f"Triggering update for '{container_name}'...")
+
+        try:
+            cloned_repo = Repo(repo_path)
+            origin = cloned_repo.remotes.origin
+            log.info(f"Pulling changes for '{container_name}'...")
+            pull_info = origin.pull()
+
+            if pull_info[0].flags & pull_info[0].flags.HEAD_UPTODATE:
+                log.info(f"Pull completed for '{container_name}', but no changes detected.")
+                app_state['last_commit'] = cloned_repo.head.commit.hexsha
+                return # Doesn't need to redeploy if no changes
+
+            new_commit_hash = cloned_repo.head.commit.hexsha
+            log.success(f"Successfully pulled updates for '{container_name}'. New commit: {new_commit_hash[:7]}")
+
+            # Generate a new Dockerfile content (in case the dockerfly.yaml changed)
+            generation_result = self.generate_dockerfile_content(repo_path)
+            if generation_result is None:
+                log.error(f"Update failed for '{container_name}': Could not regenerate Dockerfile after pull.")
+                return
+            dockerfile_content, new_app_config = generation_result
+
+            log.info(f"Redeploying application '{container_name}'...")
+            deployment_result = self.deploy_app(repo_path, repo_name, dockerfile_content, new_app_config)
+
+            if deployment_result:
+                log.success(f"Update deployment successful for '{container_name}'.")
+                self.deployed_apps[container_name].update({
+                    "last_commit": new_commit_hash,
+                    "container_id": deployment_result.get("container_id"),
+                    "image_tag": deployment_result.get("image_tag"),
+                    "app_config": new_app_config
+                })
+            else:
+                # Only log for now, could implement rollback logic later.
+                log.error(f"Update failed for '{container_name}' during redeployment step.")
+
+        except GitCommandError as git_err:
+            log.error(f"Update failed for '{container_name}': Git pull failed. Command: '{git_err.command}'. Stderr: '{git_err.stderr.strip()}'")
+        except Exception as e:
+            log.exception(f"Unexpected error during update trigger for '{container_name}': {e}")
+
