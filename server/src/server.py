@@ -412,7 +412,7 @@ class Server:
             log.info(f"Pulling changes for '{container_name}'...")
             pull_info = origin.pull()
 
-            if pull_info[0].flags & FetchInfo.flags.HEAD_UPTODATE:
+            if pull_info[0].flags & FetchInfo.HEAD_UPTODATE:
                 log.info(f"Pull completed for '{container_name}', but no changes detected.")
                 app_state['last_commit'] = cloned_repo.head.commit.hexsha
                 return # Doesn't need to redeploy if no changes
