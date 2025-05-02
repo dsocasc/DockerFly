@@ -42,7 +42,7 @@ class Server:
         """
         Clones a Git repository from the given URL into the specified path.
         :param repo_url: URL of the Git repository to clone.
-        :return: Tuple containing the path to the cloned repository and the name.
+        :return: Tuple containing the path to the cloned repository, the name and URL.
         """
         log.info(f'Received URL in clone_git: "{repo_url}"')
 
@@ -65,11 +65,11 @@ class Server:
             if os.path.exists(repo_clone_path):
                 log.error(f'Repository {repo_name} already exists. Skipping clone.')
                 # TODO: Decidir si ignorar o actualizar el repositorio existente
-                return repo_clone_path, repo_name
+                return repo_clone_path, repo_name, repo_url
 
             Repo.clone_from(repo_url, repo_clone_path, progress=self._log_git_progress)
             log.success(f'Repository cloned successfully to {repo_clone_path}')
-            return repo_clone_path, repo_name
+            return repo_clone_path, repo_name, repo_url
 
         except ValueError as ve:
             log.error(f'Error processing repository URL/name: {ve}')

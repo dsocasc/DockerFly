@@ -71,7 +71,7 @@ async def send_repo(repo_request: RepoRequest):
             status_code=400,
             detail="Failed to clone the repository. Check URL or server logs"
         )
-    repo_path, repo_name = clone_result
+    repo_path, repo_name, repo_url = clone_result
     log.info(f"Repository '{repo_name}' cloned at: '{repo_path}'")
 
     # 2. Generate Dockerfile
