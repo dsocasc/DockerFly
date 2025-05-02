@@ -130,6 +130,7 @@ class Server:
         python_version = config.get('python_version', '3.10')
         requirements_file = config.get('requirements_file', 'requirements.txt')
         port = config.get('port')
+        app_name = config.get('app_name')
         start_command_list = config.get('start_command')
         # volumes = config.get('volumes', []) # Volumes are optional.
 
@@ -161,6 +162,9 @@ class Server:
         # Copy requirements file to the working directory
         # (Docker COPY command uses the context path, not the absolute path)
         req_copy_path = requirements_file.replace(os.path.sep, '/') # Asegurar formato path para Docker COPY
+        dockerfile_lines.append("# ENV Variables for nginx reverse proxy")
+        dockerfile_lines.append(f"ENV VIRTUAL_HOST={app_name}")
+        dockerfile_lines.append(f"ENV VIRTUAL_PORT={port}")
         dockerfile_lines.append("# Copy and install requirements")
         dockerfile_lines.append(f"COPY {req_copy_path} ./{os.path.basename(req_copy_path)}") # Copiar al directorio de trabajo
         dockerfile_lines.extend(
@@ -191,8 +195,8 @@ class Server:
         """
         app_name = app_config.get('app_name', repo_name)
         image_tag = f"dockerfly/{app_name}:latest".lower().replace(" ", "-")
-        container_name = f"app-{app_name}".lower().replace(" ", "-")
-        network_name = self.main_config.get('docker', {}).get('network_name', 'bridge')
+        container_name = f"{app_name}".lower().replace(" ", "-")
+        network_name = app_config.get('network_name', 'bridge')
         container_port = app_config.get('port')
 
         generated_dockerfile_path = os.path.join(repo_path, "Dockerfile.dockerfly") # Usar nombre distinto? O 'Dockerfile'
@@ -275,7 +279,7 @@ class Server:
                 image=image_tag,
                 name=container_name,
                 network=network_name,
-                ports={f'{container_port}/tcp': None},
+                ports={f'{container_port}/tcp': container_port},
                 volumes=volumes_to_mount,
                 environment=environment_vars,
                 detach=True,

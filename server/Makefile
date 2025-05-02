@@ -5,10 +5,10 @@ DOCKERFILE_PATH = ./devops/Dockerfile
 CONFIG_FILE_PATH = ../config.yml
 
 # Read values from config.yml
-EXPOSED_PORT := $(shell yq '.server.exposed_port' $(CONFIG_FILE_PATH))
-REPO_PATH := $(shell yq '.server.repositories_clone_path' $(CONFIG_FILE_PATH))
-NETWORK_NAME := $(shell yq '.docker.network_name' $(CONFIG_FILE_PATH))
-URL := $(shell yq '.server.url' $(CONFIG_FILE_PATH))
+EXPOSED_PORT := $(shell yq  '.server.exposed_port' $(CONFIG_FILE_PATH))
+REPO_PATH := $(shell yq  '.server.repositories_clone_path' $(CONFIG_FILE_PATH))
+NETWORK_NAME := $(shell yq  '.docker.network_name' $(CONFIG_FILE_PATH))
+URL := $(shell yq  '.server.url' $(CONFIG_FILE_PATH))
 
 ifeq ($(EXPOSED_PORT),)
 $(error ERROR: Could not read .server.exposed_port from $(CONFIG_FILE_PATH). Is yq (python wrapper) installed and is the config file correct?)
