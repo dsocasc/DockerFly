@@ -5,9 +5,9 @@ DOCKERFILE_PATH = ./devops/Dockerfile
 CONFIG_FILE_PATH = ../config.yml
 
 # Read values from config.yml
-EXPOSED_PORT := $(shell yq '.ui.exposed_port' $(CONFIG_FILE_PATH))
-NETWORK_NAME := $(shell yq '.docker.network_name' $(CONFIG_FILE_PATH))
-URL := $(shell yq '.ui.url' $(CONFIG_FILE_PATH))
+EXPOSED_PORT := $(shell yq eval '.ui.exposed_port' $(CONFIG_FILE_PATH))
+NETWORK_NAME := $(shell yq eval '.docker.network_name' $(CONFIG_FILE_PATH))
+URL := $(shell yq eval '.ui.url' $(CONFIG_FILE_PATH))
 
 build:
 	docker build \
