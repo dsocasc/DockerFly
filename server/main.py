@@ -33,25 +33,53 @@ app.add_middleware(
 """
 Receives a POST request with a JSON body containing the URL of the repository to clone
 """
-@app.post('/repo', status_code=202, summary="Clone a repo and deploy it")
-async def send_repo(repo: RepoRequest):
-    log.info(f'Received request to clone repository: {repo.url}')
+@app.post('/repo', status_code=202, summary="Clone a repo, generate Dockerfile and deploy application")
+async def send_repo(repo_request: RepoRequest):
+    """
+    Received Git repo URL, clones it, generates Dockerfile based on dockerfly.yaml,
+    builds the image and runs the container.
+    """
 
-    # Clone repo
-    clone_result = server.clone_git(repo.url)
+    log.info(f'Received request for repository: {repo_request.url}')
+
+    # 1. Clone repo
+    clone_result = server.clone_git(repo_request.url)
     if clone_result is None:
-        raise HTTPException(status_code=400, detail="Failed to clone the repository.")
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to clone the repository. Check URL or server logs"
+        )
     repo_path, repo_name = clone_result
     log.info(f"Repository '{repo_name}' cloned at: '{repo_path}'")
 
-    # Generate Dockerfile
-    dockerfile_content = server.generate_dockerfile_content(repo_path)
-    if dockerfile_content is None:
-        raise HTTPException(status_code=400, detail=f"Failed to process or generate Dockerfile for '{repo_name}'. Check 'dockerfly.yaml' in the repository or server logs.")
-    log.info(f"Dockerfile content generated for '{repo_name}'")
+    # 2. Generate Dockerfile
+    generation_result = server.generate_dockerfile_content(repo_path)
+    if generation_result is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to generate Dockerfile for '{repo_name}'. Check 'dockerfly.yaml' or server logs"
+        )
 
-    # Desplegar app
-    # TODO: Issue #4
+    dockerfile_content, app_config = generation_result
+    log.info(f"Dockerfile content generated for '{repo_name}' based on its 'dockerfly.yaml'")
+
+    # 3. Deploy application
+    try:
+        deployment_result = server.deploy_app(repo_path, repo_name, dockerfile_content, app_config)
+        if deployment_result is None:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Deployment failed for '{repo_name}'. Check server logs"
+            )
+
+        log.success(f"Deployment succesful for '{repo_name}'. Result: {deployment_result}")
+        return deployment_result
+    except Exception as e:
+        log.exception(f"Unexpected error during deployment step for '{repo_name}': {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Deployment step failed unexpectedly for '{repo_name}'. Check server logs",
+        ) from e
 
 @app.get("/", summary="Check API status")
 async def root():

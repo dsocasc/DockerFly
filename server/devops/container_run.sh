@@ -27,6 +27,7 @@ docker run \
     --name $IMAGE_NAME \
     -p $EXPOSED_PORT:$EXPOSED_PORT \
     -v $DIR_PATH:$DIR_PATH \
+    -v /var/run/docker.sock:/var/run/docker.sock \
     --network=$NETWORK_NAME \
     $IMAGE_NAME \
     bash -c "uvicorn main:app --host 0.0.0.0 --port $EXPOSED_PORT"

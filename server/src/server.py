@@ -4,19 +4,29 @@ import yaml
 from loguru import logger as log
 import io
 import shutil
-from typing import Optional, Tuple
-
+from typing import Optional, Tuple, Dict, Any
+import docker
+from docker.errors import BuildError, APIError, NotFound
 
 class Server:
 
     # Constructor for the Server class
-    def __init__(self, path: str = '/repositories/'):
+    def __init__(self, path: str = '/repositories/', main_config: Dict[str, Any] = None):
         try:
             os.makedirs(path, exist_ok=True)
             self.path = path
+            self.main_config = main_config or {}
             log.info(f'Repository base path set to {path}')
         except OSError as e:
             log.critical(f'Cannot create or access repository base path {path}: {e}')
+            raise
+
+        try:
+            self.docker_client = docker.from_env()
+            self.docker_client.ping()
+            log.info('Docker client initialized successfully.')
+        except Exception as e:
+            log.critical(f'Error initializing Docker client: {e}')
             raise
 
     def _log_git_progress(self, op_code, cur_count, max_count=None, message=''):
@@ -27,7 +37,7 @@ class Server:
         """
         Clones a Git repository from the given URL into the specified path.
         :param repo_url: URL of the Git repository to clone.
-        :return: Tuple containing the path to the cloned repository and the URL.
+        :return: Tuple containing the path to the cloned repository and the name.
         """
         log.info(f'Received URL in clone_git: "{repo_url}"')
 
@@ -81,22 +91,22 @@ class Server:
 
             return None
 
-    def generate_dockerfile_content(self, repo_path: str) -> str | None:
+    def generate_dockerfile_content(self, repo_path: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         """
-        Genera el contenido del Dockerfile basado en dockerfly.yaml en el repo.
-        Devuelve el contenido del Dockerfile como string, o None si falla.
+        Generates the content of the Dockerfile based on dockerfly.yaml in the repo.
+        Returns a tuple [dockerfile_content, parsed_config], or None if it fails.
         """
         dockerfly_yaml_path = os.path.join(repo_path, 'dockerfly.yaml')
         log.info(f"Looking for configuration file: {dockerfly_yaml_path}")
 
-        if not os.path.isfile(dockerfly_yaml_path): # Usar isfile para asegurar que no es un directorio
+        if not os.path.isfile(dockerfly_yaml_path):
             log.error(f"Configuration file 'dockerfly.yaml' not found or is not a file in {repo_path}")
             return None
 
         try:
-            with open(dockerfly_yaml_path, 'r', encoding='utf-8') as f: # Especificar encoding
+            with open(dockerfly_yaml_path, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
-            if not isinstance(config, dict): # Asegurar que el YAML parsea a un diccionario
+            if not isinstance(config, dict):
                  log.error(f"Configuration file '{dockerfly_yaml_path}' is empty or has invalid format.")
                  return None
             log.success(f"Loaded configuration from {dockerfly_yaml_path}")
@@ -106,20 +116,17 @@ class Server:
         except IOError as e:
              log.error(f"Error reading file {dockerfly_yaml_path}: {e}")
              return None
-        except Exception as e: # Captura genérica por si acaso
+        except Exception as e:
              log.error(f"Unexpected error processing config {dockerfly_yaml_path}: {e}")
              return None
 
 
-        # --- Extraer config con valores por defecto y validaciones ---
-        # app_name = config.get('app_name', os.path.basename(repo_path)) # Ya tenemos repo_name
-        python_version = config.get('python_version', '3.10') # Default Python version
-        requirements_file = config.get('requirements_file', 'requirements.txt') # Default requirements file
-        port = config.get('port') # Puerto es importante, quizás no poner default? O validar después.
-        start_command_list = config.get('start_command') # Comando de inicio es crucial.
-        # volumes = config.get('volumes', []) # Volúmenes son opcionales.
+        python_version = config.get('python_version', '3.10')
+        requirements_file = config.get('requirements_file', 'requirements.txt')
+        port = config.get('port')
+        start_command_list = config.get('start_command')
+        # volumes = config.get('volumes', []) # Volumes are optional.
 
-        # --- Validar campos obligatorios ---
         errors = []
         if not isinstance(python_version, str): errors.append("'python_version' must be a string (e.g., '3.10').")
         if not isinstance(requirements_file, str) or not requirements_file: errors.append("'requirements_file' must be a non-empty string (path).")
@@ -131,13 +138,12 @@ class Server:
             for error in errors: log.error(f"Invalid dockerfly.yaml: {error}")
             return None
 
-        # Verificar si el archivo de requisitos existe realmente
         req_file_path_in_repo = os.path.join(repo_path, requirements_file)
         if not os.path.isfile(req_file_path_in_repo):
             log.error(f"Specified requirements file '{requirements_file}' not found at '{req_file_path_in_repo}'. Cannot proceed.")
             return None
 
-        # --- Construir contenido del Dockerfile ---
+        # Dockerfile content generation
         log.info("Generating Dockerfile content...")
         dockerfile_lines = [
             "# Auto-generated by DockerFly",
@@ -146,8 +152,8 @@ class Server:
             "WORKDIR /app",
             "",
         ]
-        # Copiar requisitos e instalar (primero para caché de capas)
-        # Nota: Si requirements_file está en subdirectorio, COPY necesita la ruta completa relativa
+        # Copy requirements file to the working directory
+        # (Docker COPY command uses the context path, not the absolute path)
         req_copy_path = requirements_file.replace(os.path.sep, '/') # Asegurar formato path para Docker COPY
         dockerfile_lines.append("# Copy and install requirements")
         dockerfile_lines.append(f"COPY {req_copy_path} ./{os.path.basename(req_copy_path)}") # Copiar al directorio de trabajo
@@ -162,8 +168,6 @@ class Server:
             )
         )
         dockerfile_lines.extend((f"EXPOSE {port}", ""))
-        # Comando de inicio
-        # Formato JSON preferido para CMD: ["executable", "param1", "param2"]
         cmd_json_array = '[' + ', '.join(f'"{item}"' for item in start_command_list) + ']'
         dockerfile_lines.append("# Set the start command")
         dockerfile_lines.append(f"CMD {cmd_json_array}")
@@ -171,4 +175,129 @@ class Server:
         dockerfile_content = "\n".join(dockerfile_lines)
         log.debug(f"Generated Dockerfile:\n---\n{dockerfile_content}\n---")
         log.success("Dockerfile content generated successfully.")
-        return dockerfile_content
+
+        return dockerfile_content, config
+
+    def deploy_app(self, repo_path: str, repo_name: str, dockerfile_content: str, app_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Construye la imagen Docker y lanza el contenedor para la aplicación.
+        Devuelve un diccionario con info del despliegue o None si falla.
+        """
+        app_name = app_config.get('app_name', repo_name)
+        image_tag = f"dockerfly/{app_name}:latest".lower().replace(" ", "-")
+        container_name = f"app-{app_name}".lower().replace(" ", "-")
+        network_name = self.main_config.get('docker', {}).get('network_name', 'bridge')
+        container_port = app_config.get('port')
+
+        log.info(f"Starting deployment for app '{app_name}'...")
+
+        # 1. Build the image using the Dockerfile content
+        dockerfile_fileobj = io.BytesIO(dockerfile_content.encode('utf-8'))
+        try:
+            log.info(f"Building image '{image_tag}' from context path '{repo_path}'...")
+            image, build_logs_stream = self.docker_client.images.build(
+                path=repo_path,
+                fileobj=dockerfile_fileobj,
+                tag=image_tag,
+                rm=True,
+                forcerm=True
+            )
+            log.success(f"Image built successfully: {image.short_id} ({image.tags[0]})")
+
+        except BuildError as e:
+            log.error(f"Docker build failed for image '{image_tag}':")
+            for line in e.build_log:
+                if 'stream' in line:
+                    log.error(f"Build log: {line['stream'].strip()}")
+            return None
+        except APIError as e:
+            log.error(f"Docker API error during build for '{image_tag}': {e}")
+            return None
+        except Exception as e:
+            log.exception(f"Unexpected error during image build for '{image_tag}': {e}")
+            return None
+
+        # 2. Stop and remove existing container (if any)
+        try:
+            existing_container = self.docker_client.containers.get(container_name)
+            log.warning(f"Found existing container '{container_name}'. Stopping and removing...")
+            existing_container.stop(timeout=10) # Dar tiempo para parar grácilmente
+            existing_container.remove()
+            log.info(f"Existing container '{container_name}' removed.")
+        except NotFound:
+            log.info(f"No existing container named '{container_name}'.")
+        except APIError as e:
+            log.error(f"Docker API error stopping/removing container '{container_name}': {e}")
+            return None
+
+        # 3. Launch the new container with dynamic port mapping
+        try:
+            log.info(f"Starting new container '{container_name}' from image '{image_tag}'...")
+
+            volumes_to_mount = {}
+            for volume_mapping in app_config.get('volumes', []):
+                 if isinstance(volume_mapping, str) and ':' in volume_mapping:
+                     host_part, container_part = volume_mapping.split(':', 1)
+                     if host_part.startswith('/'):
+                         log.warning(f"Mounting host path '{host_part}' - Ensure permissions are correct on the host.")
+                         # Crear ruta host si no existe? Podría ser peligroso.
+                         # os.makedirs(host_part, exist_ok=True)
+                     volumes_to_mount[host_part] = {'bind': container_part, 'mode': 'rw'}
+                 else:
+                     log.warning(f"Skipping invalid volume format in dockerfly.yaml: '{volume_mapping}'. Expected 'host_path_or_named_volume:container_path'.")
+
+            # --- Preparar Variables de Entorno ---
+            environment_vars = app_config.get('environment_variables', {})
+            if not isinstance(environment_vars, dict):
+                 log.warning("'environment_variables' in dockerfly.yaml is not a dictionary. Ignoring.")
+                 environment_vars = {}
+
+
+            container = self.docker_client.containers.run(
+                image=image_tag,
+                name=container_name,
+                network=network_name,
+                ports={f'{container_port}/tcp': None},
+                volumes=volumes_to_mount,
+                environment=environment_vars,
+                detach=True,
+                restart_policy={"Name": "unless-stopped"}
+            )
+
+            container.reload()
+
+            assigned_host_port = None
+            try:
+                port_data = container.ports.get(f'{container_port}/tcp')
+                if port_data and isinstance(port_data, list) and len(port_data) > 0:
+                    assigned_host_port = port_data[0].get('HostPort')
+                if not assigned_host_port: raise ValueError("HostPort not found") # Forzar error si no se encuentra
+            except Exception as port_e:
+                 log.error(f"Could not determine assigned host port for container '{container_name}': {port_e}")
+                 raise
+
+            # Build access URL (assuming localhost, could be configurable)
+            # TODO: Get the host IP/hostname more reliably if not localhost
+            host_access_point = "localhost"
+            access_url = f"http://{host_access_point}:{assigned_host_port}"
+
+            log.success(f"Container '{container_name}' started successfully (ID: {container.short_id}).")
+            log.info(f"App '{app_name}' running internally on port {container_port}. Access via: {access_url}")
+
+            return {
+                "message": "Deployment successful",
+                "app_name": app_name,
+                "container_name": container_name,
+                "container_id": container.short_id,
+                "image_tag": image_tag,
+                "internal_port": container_port,
+                "assigned_host_port": assigned_host_port,
+                "access_url": access_url
+            }
+
+        except APIError as e:
+            log.error(f"Docker API error starting container '{container_name}': {e}")
+            return None
+        except Exception as e:
+            log.exception(f"Unexpected error running container '{container_name}': {e}")
+            return None
